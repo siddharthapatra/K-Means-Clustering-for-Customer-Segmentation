@@ -33,7 +33,7 @@ length(unique(data$CustomerID))
 sum(is.na(data$CustomerID))
 data <- subset(data, !is.na(data$CustomerID))
 
-#Some research indicates that customer clusters vary by geography.
+#Customer clusters vary by geography.
 #So here we’ll restrict the data to one geographic unit.
 table(data$Country)
 
@@ -44,9 +44,10 @@ data <- subset(data, Country == "United Kingdom")
 #Let's see the number of unique invoices and unique customers.
 length(unique(data$InvoiceNo))
 length(unique(data$CustomerID))
+#We now have a dataset of 19,857 unique invoices and 3,950 unique customers.
 
 #To calculate the recency and frequency variables below, it will be necessary to distinguish invoices with purchases from invoices with returns.
-# Identify returns
+#Identify returns
 data$item.return <- grepl("C", data$InvoiceNo, fixed=TRUE)
 data$purchase.invoice <- ifelse(data$item.return=="TRUE", 0, 1)
 
@@ -65,12 +66,14 @@ names(customers) <- "CustomerID"
 # Recency #
 ###########
 
+#Converting 'InvoiceDate' from factor to date type format
 data$InvoiceDate <- as.Date(data$InvoiceDate, "%d-%b-%y")
 str(data)
 
+# Adding a recency column by substracting the InvoiceDate from the (last InvoiceDate+1)
 data$recency <- as.Date("2017-12-08") - as.Date(data$InvoiceDate)
 
-# remove returns so only consider the data of most recent *purchase*
+# remove returns so only consider the data of most recent "purchase"
 temp <- subset(data, purchase.invoice == 1)
 
 # Obtain # of days since most recent purchase
@@ -118,12 +121,12 @@ customers <- subset(customers, frequency > 0)
 data$Amount <- data$Quantity * data$UnitPrice
 
 # Aggregated total sales to customer
-annual.sales <- aggregate(Amount ~ CustomerID, data=data, FUN=sum, na.rm=TRUE)
-names(annual.sales)[names(annual.sales)=="Amount"] <- "monetary"
+total.sales <- aggregate(Amount ~ CustomerID, data=data, FUN=sum, na.rm=TRUE)
+names(total.sales)[names(total.sales)=="Amount"] <- "monetary"
 
 # Add monetary value to customers dataset
-customers <- merge(customers, annual.sales, by="CustomerID", all.x=TRUE, sort=TRUE)
-remove(annual.sales)
+customers <- merge(customers, total.sales, by="CustomerID", all.x=TRUE, sort=TRUE)
+remove(total.sales)
 
 # Identify customers with negative monetary value numbers, as they were presumably returning purchases from the preceding year
 hist(customers$monetary)
@@ -132,9 +135,9 @@ hist(customers$monetary)
 
 
 
-###############
-# 80/20 Rule #
-##############
+################################
+# Pareto Principle: 80/20 Rule #
+################################
 
 customers <- customers[order(-customers$monetary),]
 
@@ -203,7 +206,7 @@ scatter.2
 # Handling outliers #
 #####################
 
-# How many customers are represented by the two data points in the lower left-hand corner of the plot? 18
+# How many customers are represented by the two data points in the lower left-hand corner of the plot? 19
 delete <- subset(customers, monetary.log < 0)
 no.value.custs <- unique(delete$CustomerID)
 delete2 <- subset(data, CustomerID %in% no.value.custs)
@@ -236,57 +239,57 @@ models <- data.frame(k=integer(),
                      totss=numeric(),
                      rsquared=numeric())
 
-for (k in 1:j ) {
-  
-  print(k)
-  
-  # Run kmeans
-  # nstart = number of initial configurations; the best one is used
-  # $iter will return the iteration used for the final model
-  output <- kmeans(preprocessed, centers = k, nstart = 20)
-  
-  # Add cluster membership to customers dataset
-  var.name <- paste("cluster", k, sep="_")
-  customers[,(var.name)] <- output$cluster
-  customers[,(var.name)] <- factor(customers[,(var.name)], levels = c(1:k))
-  
-  # Graph clusters
-  cluster_graph <- ggplot(customers, aes(x = frequency.log, y = monetary.log))
-  cluster_graph <- cluster_graph + geom_point(aes(colour = customers[,(var.name)]))
-  colors <- c('red','orange','green3','deepskyblue','blue','darkorchid4','violet','pink1','tan3','black')
-  cluster_graph <- cluster_graph + scale_colour_manual(name = "Cluster Group", values=colors)
-  cluster_graph <- cluster_graph + xlab("Log-transformed Frequency")
-  cluster_graph <- cluster_graph + ylab("Log-transformed Monetary Value of Customer")
-  title <- paste("k-means Solution with", k, sep=" ")
-  title <- paste(title, "Clusters", sep=" ")
-  cluster_graph <- cluster_graph + ggtitle(title)
-  print(cluster_graph)
-  
-  # Cluster centers in original metrics
-  library(plyr)
-  print(title)
-  cluster_centers <- ddply(customers, .(customers[,(var.name)]), summarize,
-                           monetary=round(median(monetary),2),# use median b/c this is the raw, heavily-skewed data
-                           frequency=round(median(frequency),1),
-                           recency=round(median(recency), 0))
-  names(cluster_centers)[names(cluster_centers)=="customers[, (var.name)]"] <- "Cluster"
-  print(cluster_centers)
-  cat("\n")
-  cat("\n")
-  
-  # Collect model information
-  models[k,("k")] <- k
-  models[k,("tot.withinss")] <- output$tot.withinss # the sum of all within sum of squares
-  models[k,("betweenss")] <- output$betweenss
-  models[k,("totss")] <- output$totss # betweenss + tot.withinss
-  models[k,("rsquared")] <- round(output$betweenss/output$totss, 3) # percentage of variance explained by cluster membership
-  assign("models", models, envir = .GlobalEnv)
-  
-  remove(output, var.name, cluster_graph, cluster_centers, title, colors)
-  
-}
-
-remove(k)
+    for (k in 1:j ) {
+      
+      print(k)
+      
+      # Run kmeans
+      # nstart = number of initial configurations; the best one is used
+      # $iter will return the iteration used for the final model
+      output <- kmeans(preprocessed, centers = k, nstart = 20)
+      
+      # Add cluster membership to customers dataset
+      var.name <- paste("cluster", k, sep="_")
+      customers[,(var.name)] <- output$cluster
+      customers[,(var.name)] <- factor(customers[,(var.name)], levels = c(1:k))
+      
+      # Graph clusters
+      cluster_graph <- ggplot(customers, aes(x = frequency.log, y = monetary.log))
+      cluster_graph <- cluster_graph + geom_point(aes(colour = customers[,(var.name)]))
+      colors <- c('red','orange','green3','deepskyblue','blue','darkorchid4','violet','pink1','tan3','black')
+      cluster_graph <- cluster_graph + scale_colour_manual(name = "Cluster Group", values=colors)
+      cluster_graph <- cluster_graph + xlab("Log-transformed Frequency")
+      cluster_graph <- cluster_graph + ylab("Log-transformed Monetary Value of Customer")
+      title <- paste("k-means Solution with", k, sep=" ")
+      title <- paste(title, "Clusters", sep=" ")
+      cluster_graph <- cluster_graph + ggtitle(title)
+      print(cluster_graph)
+      
+      # Cluster centers in original metrics
+      library(plyr)
+      print(title)
+      cluster_centers <- ddply(customers, .(customers[,(var.name)]), summarize,
+                               monetary=round(median(monetary),2),# use median b/c this is the raw, heavily-skewed data
+                               frequency=round(median(frequency),1),
+                               recency=round(median(recency), 0))
+      names(cluster_centers)[names(cluster_centers)=="customers[, (var.name)]"] <- "Cluster"
+      print(cluster_centers)
+      cat("\n")
+      cat("\n")
+      
+      # Collect model information
+      models[k,("k")] <- k
+      models[k,("tot.withinss")] <- output$tot.withinss # the sum of all within sum of squares
+      models[k,("betweenss")] <- output$betweenss
+      models[k,("totss")] <- output$totss # betweenss + tot.withinss
+      models[k,("rsquared")] <- round(output$betweenss/output$totss, 3) # percentage of variance explained by cluster membership
+      assign("models", models, envir = .GlobalEnv)
+      
+      remove(output, var.name, cluster_graph, cluster_centers, title, colors)
+      
+    }
+    
+    remove(k)
 
 # Graph variance explained by number of clusters
 r2_graph <- ggplot(models, aes(x = k, y = rsquared))
